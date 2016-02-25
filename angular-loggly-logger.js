@@ -30,6 +30,8 @@
 
       var token = null;
       var endpoint = '://logs-01.loggly.com/inputs/';
+      
+      var buffer = [];
 
         var buildUrl = function () {
           return (https ? 'https' : 'http') + endpoint + token + '/tag/' + (tag ? tag : 'AngularJS' ) + '/'
@@ -147,6 +149,17 @@
 
         var lastLog = null;
 
+        var flushBuffer = function ($http) {
+          var config = {
+            headers: {
+              'Content-Type': 'text/plain'
+            }
+          };
+          var bulk = buffer.join('\n');
+          buffer = [];
+          return $http.post(buildUrl(), bulk, config);
+        }
+        var throttleFlushBuffer = _.throttle(flushBuffer, 10000);
 
         /**
          * Send the specified data to loggly as a json message.
@@ -174,18 +187,10 @@
           if( includeTimestamp ) {
             sentData.timestamp = lastLog.toISOString();
           }
+          
+          buffer.push(JSON.stringify(sentData));
+          throttleFlushBuffer($http);
 
-          //Loggly's API doesn't send us cross-domain headers, so we can't interact directly
-           //Set header
-          var config = {
-            headers: {
-             'Content-Type': 'text/plain'
-            }
-          };
-          
-          
-          //Ajax call to send data to loggly
-          $http.post(buildUrl(),sentData,config);
         };
 
         var attach = function() {
